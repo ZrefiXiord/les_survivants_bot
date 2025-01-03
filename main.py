@@ -9,14 +9,19 @@ import json
 load_dotenv()
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID"))
-SPREADSHEET_ID = os.getenv("SPREADSHEET_ID")
 CREDENTIALS_FILE = os.getenv("GOOGLE_CREDENTIALS_PATH")
-PROCESSED_MESSAGES_FILE = os.getenv("PROCESSED_MESSAGES_PATH")
-LAST_ROW_FILE = "last_row.txt"  
-MESSAGE_DELAY_MINUTES = 1
-VALIDATION_DELAY_MINUTES = 4
-ROLE_NAME = "Test"
+
+with open("config.json", "r") as config_file:
+    config = json.load(config_file)
+CHANNEL_ID = config["CHANNEL_ID"]
+SPREADSHEET_ID = config["SPREADSHEET_ID"]
+PROCESSED_MESSAGES_FILE = config["PROCESSED_MESSAGES_PATH"]
+LAST_ROW_FILE = config["LAST_ROW_FILE"]
+CHECK_SHEET_DELAY_SECONDS = config["CHECK_SHEET_DELAY_SECONDS"]
+ROLE_NAME = config["ROLE_NAME"]
+WELCOME_MESSAGE = config["WELCOME_MESSAGE"]
+ACCEPTED_MESSAGE = config["ACCEPTED_MESSAGE"]
+REFUSED_MESSAGE = config["REFUSED_MESSAGE"]
 
 creds = Credentials.from_service_account_file(CREDENTIALS_FILE)
 service = build('sheets', 'v4', credentials=creds)
@@ -25,8 +30,6 @@ intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True  
 client = discord.Client(intents=intents)
-
-
 
 def read_processed_messages():
     """Reads processed messages from disk."""
@@ -56,9 +59,9 @@ def write_last_row(row):
 
 last_row = read_last_row()
 
-async def send_delayed_message(user_name, message_content):
+async def send_delayed_message(user_name, message_content, delay):
     """Sends a delayed message to the user."""
-    await asyncio.sleep(MESSAGE_DELAY_MINUTES*60)
+    await asyncio.sleep(delay*60)
     await send_message(user_name, message_content)
 
 async def send_message(user_name, message_content):
@@ -113,13 +116,13 @@ async def check_new_responses():
                             sent_message = await channel.send(embed=embed)
                             await sent_message.add_reaction("✅")
                             await sent_message.add_reaction("❌")
-                            message_content = "Ta demande va être traitée."
-                            asyncio.create_task(send_delayed_message(discord_username, message_content))
+                            message_content = WELCOME_MESSAGE
+                            asyncio.create_task(send_message(discord_username, message_content))
 
         except Exception as e:
             print(f"Error: {e}")
 
-        await asyncio.sleep(10)
+        await asyncio.sleep(CHECK_SHEET_DELAY_SECONDS)
 
 async def validate_reactions(message):
     """Validates reactions on a message by checking if at least 60% of members with a specific role reacted and if positive reactions (✅) outnumber negative ones (❌)."""
@@ -161,10 +164,10 @@ async def validate_reactions(message):
             # Check if positive reactions are greater than negative reactions
             if positive_reactions_count > negative_reactions_count:
                 embed.set_footer(text=f"Statut: Accepté - {positive_reactions_count}/{negative_reactions_count}")
-                message_content = "Tu es accepté dans le serveur."
+                message_content = ACCEPTED_MESSAGE
             else:
                 embed.set_footer(text=f"Statut: Refusé - {positive_reactions_count}/{negative_reactions_count}")
-                message_content = "Tu n'es pas accepté dans le serveur."
+                message_content = REFUSED_MESSAGE
 
             # Send the validation message to the user
             for field in message.embeds[0].fields:
@@ -205,7 +208,8 @@ async def on_ready():
     """Event handler when the bot is ready."""
     global channel, guild
     channel = client.get_channel(CHANNEL_ID)
-    guild = client.get_channel(CHANNEL_ID).guild
+    guild = channel.guild
+    print("Connected")
     await client.change_presence(activity=discord.Game(name="toto"))
     await check_message_history()
     client.loop.create_task(check_new_responses())
