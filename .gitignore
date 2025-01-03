@@ -1,0 +1,36 @@
+# Environnements virtuels Python
+venv/
+.env/
+*.env
+*.venv
+
+# Fichiers sensibles
+*.json
+*.yaml
+*.yml
+.env
+credentials.json
+
+# Caches Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Fichiers générés
+*.log
+*.out
+*.tmp
+*.bak
+
+# Données système
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Dossiers liés à l'IDE
+.vscode/
+.idea/
+
+# Autres fichiers temporaires
+*.swp
+*.swo
